@@ -10,11 +10,26 @@ import Data.Array.IO
 import Data.Bits (xor)
 import Data.ByteString.Char8 (pack)
 import Data.Maybe (fromJust)
+import Data.Tuple (swap)
 import Network.HTTP.Client (newManager, responseBody, parseRequest, httpLbs, method, requestHeaders)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Options.Applicative.Simple
 import System.Environment
 import System.Random
+
+-- TODO FIXME don't hardcode
+syntheticPairs :: [(Task, Task)]
+syntheticPairs =
+  [ ( Task { crate = "brew", n = 0, kind = Tree }
+    , Task { crate = "space", n = 0, kind = Tree }
+    )
+  , ( Task { crate = "brew", n = 1, kind = Typestate }
+    , Task { crate = "space", n = 3, kind = Typestate }
+    )
+  , ( Task { crate = "brew", n = 2, kind = Typestate }
+    , Task { crate = "space", n = 2, kind = Typestate }
+    )
+  ]
 
 
 loadData :: String -> String -> IO DB
@@ -67,18 +82,22 @@ isValidStudy StudyPlan
   -- one block cannot have the same kind twice
   kind ts1 /= kind ts1' &&
   kind ts2 /= kind ts2' &&
-  -- needs to be two synthetic crates of the same kind, but different crate
-  2 == length synthetics &&
-  all'eq (map kind synthetics) &&
-  all'neq (map crate synthetics) &&
-  -- needs to be two non-synthetic crates of the same kind, but different
-  2 == length real'worlds &&
-  all'eq (map kind real'worlds) &&
-  all'neq real'worlds
+  -- at least one must be a real-world crate
+  length real'worlds > 0
+
+  -- -- needs to be two synthetic crates of the same kind, but different crate
+  -- 2 == length synthetics &&
+  -- all'eq (map kind synthetics) &&
+  -- all'neq (map crate synthetics) &&
+  -- -- needs to be two other crates of the same kind, different from
+  -- -- each other and the synthetic choices
+  -- 2 == length real'worlds &&
+  -- all'eq (map kind real'worlds) &&
+  -- all'neq real'worlds
   where
     synthetics = filter isSynthetic [ts1, ts1', ts2, ts2']
     real'worlds = filter (not . isSynthetic) [ts1, ts1', ts2, ts2']
-    all'eq = (1 ==) . length . dedup
+    -- all'eq = (1 ==) . length . dedup
     all'neq ls = (length ls ==) . length . dedup $ ls
     isSynthetic Task { crate } = elem crate ["space", "brew"]
 
@@ -86,14 +105,14 @@ isValidStudy StudyPlan
 
 allStudies :: DB -> [StudyPlan]
 allStudies DB { tasks } = do
-  ts1 <- tasks
-  ts1' <- tasks
-  ts2 <- tasks
-  ts2' <- tasks
+  (ts1, ts1') <- syntheticPairs ++ map swap syntheticPairs
+  let nonPairs = filter (\t -> not $ elem t [ts1, ts1']) tasks
+  ts2 <- nonPairs
+  ts2' <- nonPairs
   b <- [True, False]
   return StudyPlan
-    { blockOne = (ts1, ts1', b)
-    , blockTwo = (ts2, ts2', not b)
+    { blockOne = (ts1, ts2, b)
+    , blockTwo = (ts1', ts2', not b)
     }
 
 validStudySpace :: DB -> [StudyPlan]
