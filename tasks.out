@@ -1,18 +1,5 @@
 [No Argus
 ---
-brew 2 Typestate
-space 0 Tree
-
-
-With Argus
----
-space 2 Typestate
-axum 0 Tree
-
-
-
-,No Argus
----
 space 3 Typestate
 space 0 Tree
 
